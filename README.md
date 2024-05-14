@@ -446,6 +446,7 @@ Although the product line has the best-selling product, it also has a product th
 WITH
 CTE_BestProducts_country AS (
 SELECT c.country,
+       p.productLine,
        MAX(SUM(od.quantityOrdered)) OVER(PARTITION BY c.country) AS MaxProductSold,
        MIN(ISNULL(SUM(od.quantityOrdered),0)) OVER(PARTITION BY c.country) AS MinProductSold,
        RANK() OVER(PARTITION BY c.country ORDER BY SUM(od.quantityOrdered) DESC) AS RankMax,
@@ -462,10 +463,10 @@ SELECT c.country,
 )
 
 SELECT plmax.country,
-       plmax.productLine,
-       plmax.MaxProductSold,
-       plmin.productLine,
-       plmin.MinProductSold,
+       plmax.productLine AS Best_productLine,
+       plmax.MaxProductSold AS Best_MaxProductSold,
+       plmin.productLine AS Worst_productLine,
+       plmin.MinProductSold AS Worst_MinProductSold,
        plmax.range
   FROM (SELECT * FROM CTE_BestProducts_country WHERE RankMax=1) plmax
   JOIN (SELECT * FROM CTE_BestProducts_country WHERE RankMin=1) plmin
@@ -473,9 +474,45 @@ SELECT plmax.country,
  ORDER BY plmax.country, plmax.MaxProductSold DESC
 ```
 <h6>Answer:</h6>
- <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/m).png">
+<img width="436" alt="m)" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/f0d15138-7198-4c12-8139-1e8aca2a410f">
 <p> 
 Most countries prefer the Classic Cars product line. However, in Canada they prefer Trucks and Buses, in Hong Kong and Japan they prefer Planes. The latter two categories are known to have the lowest sales. More research could be done on the market in these specific countries, understanding the customer's needs, increasing their visibility or complementing with other products to diversify it.
+</p>
+
+<li><h5> Which product lines have zero sales by country? </h5></li>
+
+```sql
+WITH
+CTE_ProductLine_country AS (
+SELECT p.productLine,
+       c.country,
+       ISNULL(SUM(od.quantityOrdered),0) AS TotalProductSold
+  FROM OPENQUERY(STORES , 'SELECT * FROM products') p
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON od.productCode = p.productCode
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orders') o
+    ON o.orderNumber = od.orderNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM customers') c
+    ON c.customerNumber = o.customerNumber
+ GROUP BY p.productLine, c.country
+)
+
+SELECT c.country,
+       pl.productLine,
+       ISNULL(cte.TotalProductSold,0) AS TotalProductSold
+  FROM OPENQUERY(STORES , 'SELECT * FROM productlines') pl
+ CROSS JOIN (SELECT DISTINCT(country)
+  FROM OPENQUERY(STORES , 'SELECT * FROM customers')) c
+  LEFT JOIN CTE_ProductLine_country cte
+    ON pl.productLine = cte.productLine
+       AND c.country = cte.country
+ WHERE ISNULL(cte.TotalProductSold,0) = 0
+ ORDER BY c.country, pl.productLine
+```
+<h6>Answer:</h6>
+<img width="215" alt="n)" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/4b742723-4eb7-4b78-a7df-ea93b1143eaa">
+<p> 
+Austria is a country where only the Trains category has not sold, the company could begin to explore how to introduce this category to the market. Hong Kong is a country where there are no sales of Classic cars (the best line of the company), the company could campaign to introduce this category as a complement to the Planes products. In general there are many countries that have many categories without purchases, therefore, there is a lot of market to explore. 
 </p>
 
 
