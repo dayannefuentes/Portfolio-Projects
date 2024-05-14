@@ -53,6 +53,10 @@ SELECT OBJECT_NAME(f.parent_object_id) AS TableWithForeignKey,
   JOIN sys.foreign_key_columns AS fc
     ON f.object_id = fc.constraint_object_id   -- The information for the main tables to be used is queried.
 ```
+<p>
+Below are some queries to obtain information about the main tables to be used
+</p>
+
 ```sql
 SELECT *
   FROM OPENQUERY(STORES , 'SELECT * FROM customers')
