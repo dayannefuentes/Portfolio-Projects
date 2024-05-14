@@ -28,9 +28,7 @@ The scale model cars database contains eight tables: 
 
 Each table contains a column with its primary key, and is linked to the key of another table as shown in the schematic (IMAGE)  
 
-
-
-<img width="500" alt="Schema" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/schema%20stores.png">
+<img width="535" alt="schema stores" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/aedabc75-aed7-4432-aafd-e475a70904c8">
 
 Information about the relationships between tables can also be obtained in tabular form using the following query:
 
@@ -574,4 +572,228 @@ SELECT plmax.country,
 <img width="672" alt="o)" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/d26e6b77-9c6c-47ac-b530-955e1f0de331">
 <p> Knowing the most and least sold products could help in inventory management, prioritizing by country those products with higher demand and reducing overstock for those that are not. In addition, depending on the most popular products, marketing strategies could be oriented to increase sales, and the least popular products could be used to boost sales and, depending on consumer behavior, the least sold products could be used as a complement to the best sellers. </p>
 
+<li><h5> Which office and person has the most sales? </h5></li>
 
+```sql
+SELECT offices.country,
+       offices.city,
+       SUM(od.quantityOrdered) AS TotalProductSold,
+       RANK() OVER (PARTITION BY offices.city ORDER BY SUM(od.quantityOrdered)DESC) AS rank
+  FROM OPENQUERY(STORES , 'SELECT * FROM products') p
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON od.productCode = p.productCode
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orders') o
+    ON o.orderNumber = od.orderNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM customers') c
+    ON c.customerNumber = o.customerNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM employees') e
+    ON e.employeeNumber = c.salesRepEmployeeNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM offices') offices
+    ON offices.officeCode = e.officeCode
+ GROUP BY offices.country, offices.city
+ ORDER BY SUM(od.quantityOrdered)DESC
+```
+
+<h6>Answer:</h6>
+<img width="220" alt="p)" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/4a7c2ce2-a3e9-4d58-8b05-598513ce9343">
+
+<p> The best-selling office is Paris with 33887 sales. </p>
+
+<li><h5> Top 3 employees according to sales level </h5></li>
+
+```sql
+SELECT TOP 3
+       offices.country,
+       offices.city,
+       e.employeeNumber,
+       e.firstName + ' ' + e.lastName AS FullName,
+       SUM(od.quantityOrdered) AS TotalProductSold,
+       RANK() OVER (PARTITION BY offices.city ORDER BY SUM(od.quantityOrdered)DESC) AS rank_office,
+       RANK() OVER(ORDER BY SUM(od.quantityOrdered)DESC) AS rank_employee
+  FROM OPENQUERY(STORES , 'SELECT * FROM products') p
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON od.productCode = p.productCode
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orders') o
+    ON o.orderNumber = od.orderNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM customers') c
+    ON c.customerNumber = o.customerNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM employees') e
+    ON e.employeeNumber = c.salesRepEmployeeNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM offices') offices
+    ON offices.officeCode = e.officeCode
+ GROUP BY offices.country, offices.city, e.employeeNumber, e.firstName + ' ' + e.lastName
+ ORDER BY SUM(od.quantityOrdered)DESC
+```
+
+<h6>Answer:</h6>
+<img width="446" alt="q)" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/77b3d741-fdef-4e26-9816-961762b6ce3b">
+
+<p> The best employees are Gerard Hernandez, Leslie Jennings and Pamela Castillo. Two of them belong to the Paris office </p>
+
+<li><h5> Best employee by office </h5></li>
+
+```sql
+WITH
+CTE_offices_employees AS(
+SELECT offices.country,
+       offices.city,
+       e.employeeNumber,
+       e.firstName + ' ' + e.lastName AS FullName,
+       SUM(od.quantityOrdered) AS TotalProductSold,
+       RANK() OVER (PARTITION BY offices.city ORDER BY SUM(od.quantityOrdered)DESC) AS rank_office,
+       RANK() OVER(ORDER BY SUM(od.quantityOrdered)DESC) AS rank_employee
+  FROM OPENQUERY(STORES , 'SELECT * FROM products') p
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON od.productCode = p.productCode
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orders') o
+    ON o.orderNumber = od.orderNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM customers') c
+    ON c.customerNumber = o.customerNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM employees') e
+    ON e.employeeNumber = c.salesRepEmployeeNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM offices') offices
+    ON offices.officeCode = e.officeCode
+ GROUP BY offices.country, offices.city, e.employeeNumber, e.firstName + ' ' + e.lastName
+)
+
+SELECT *
+  FROM CTE_offices_employees
+ WHERE rank_office = 1
+ ORDER BY TotalProductSold DESC
+```
+
+<h6>Answer:</h6>
+<img width="452" alt="r)" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/d10b692c-31ab-4129-9d2b-2ac000d938ac">
+
+<p> The query shows the employee with the highest quantity of product sold according to the office. </p>
+
+<li><h5> Average monthly product sold </h5></li>
+
+```sql
+WITH
+CTE_ProductSold_Month AS (
+SELECT YEAR(o.orderDate) AS year,
+       MONTH(o.orderDate) AS month,
+       SUM(od.quantityOrdered) AS TotalProductSold
+  FROM OPENQUERY(STORES , 'SELECT * FROM orders') o
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON o.orderNumber = od.orderNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM products') p
+    ON od.productCode = p.productCode
+ GROUP BY YEAR(o.orderDate), MONTH(o.orderDate)
+)
+
+SELECT AVG(TotalProductSold) AS AVGProductSold
+  FROM CTE_ProductSold_Month
+```
+
+<h6>Answer:</h6>
+<img width="95" alt="s)" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/d2ca2812-f575-41ca-8779-25b3da32fdaf">
+
+<p> On average, the amount sold per month is 3638 </p>
+
+<li><h5> Who are the VIP customers? </h5></li>
+
+```sql
+WITH
+CTE_profit_by_customer AS (
+SELECT o.customerNumber,
+       SUM(od.quantityOrdered * (od.priceEach - p.buyPrice)) AS profit
+  FROM OPENQUERY(STORES , 'SELECT * FROM products') p
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON p.productCode = od.productCode
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orders') o
+    ON o.orderNumber = od.orderNumber  GROUP BY o.customerNumber
+)
+
+SELECT TOP 5
+       contactLastName,
+       contactFirstName,
+       city,
+       country,
+       ROUND(profit,2) AS profit
+  FROM OPENQUERY(STORES , 'SELECT * FROM customers') c
+  JOIN CTE_profit_by_customer cte
+    ON cte.customerNumber = c.customerNumber
+ ORDER BY profit DESC
+```
+
+<h6>Answer:</h6>
+<img width="305" alt="t)" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/e6d8f75c-3d1f-44ed-9f2d-1168ba94df17">
+
+<p> The aim is to understand consumer behaviors by categorizing them as VIP (very important person) customers and those who are less engaged. VIP customers contribute the highest profits to the store. Less-engaged customers generate lower profits. The top 5 customers are selected taking into account the profit, which is the sum of all ordered quantities multiplied by the price of the product minus the cost of the product. The less-engaged are the same query, ordered ascending. Taking this into account, the company can organize some events to drive loyalty for the VIPs and launch a campaign for the less engaged, using communication and marketing strategies. 
+
+Top 5 customers are Freyre, Nelson, Young, Ferguson and Labrune.
+
+The 5 clients with the least profit are Mary, Leslie, Franco, Carine and Thomas. </p>
+
+<li><h5> Should investments be made to attract new customers? </h5></li>
+
+```sql
+WITH
+payment_with_year_month_table AS (
+SELECT *,
+       CONVERT(varchar(6),pay.paymentDate,112) AS year_month
+  FROM OPENQUERY(STORES , 'SELECT * FROM payments') pay
+),
+customers_by_month_table AS (
+SELECT p1.year_month,
+       COUNT(*) AS number_of_customers,
+       SUM(p1.amount) AS total
+  FROM payment_with_year_month_table p1
+ GROUP BY p1.year_month
+),
+new_customers_by_month_table AS (
+SELECT p1.year_month,
+       COUNT(*) AS number_of_new_customers,
+       SUM(p1.amount) AS new_customer_total,
+       (SELECT number_of_customers
+          FROM customers_by_month_table c
+         WHERE c.year_month = p1.year_month) AS number_of_customers,
+       (SELECT total
+          FROM customers_by_month_table c
+         WHERE c.year_month = p1.year_month) AS total
+  FROM payment_with_year_month_table p1
+ WHERE p1.customerNumber NOT IN (SELECT customerNumber
+                                   FROM payment_with_year_month_table p2
+                                  WHERE p2.year_month < p1.year_month)
+ GROUP BY p1.year_month
+)
+
+SELECT year_month,
+       ROUND(number_of_new_customers*100/number_of_customers,1) AS number_of_new_customers_props,
+       ROUND(new_customer_total*100/total,1) AS new_customers_total_props
+  FROM new_customers_by_month_table
+ ORDER BY year_month 
+```
+
+<h6>Answer:</h6>
+<img width="316" alt="u)" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/2a411982-fb14-41f1-b74a-f15a682e9c39">
+
+<p> It's crucial to understand the behavior of new customers, including whether their numbers have grown over time, to determine if the company should allocate resources towards attracting new clientele. A query is made that calculates the number of new customers that arrive each month. That way we can check if it's worth spending money on acquiring new customers. As evident from the data, the number of clients has been declining since 2003, reaching its lowest point in 2004. Additionally, the absence of data for the year 2005, despite its presence in the database, indicates that the store hasn't acquired any new customers since September 2004. Therefore, it would be advisable to allocate resources towards acquiring new customers given the declining customer base. </p>
+
+<li><h5> What is the Customer Lifetime Value (LTV)? </h5></li>
+
+```sql
+WITH
+CTE_profit_by_customer AS (
+SELECT o.customerNumber,
+       SUM(od.quantityOrdered * (od.priceEach - p.buyPrice)) AS profit
+  FROM OPENQUERY(STORES , 'SELECT * FROM products') p
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON p.productCode = od.productCode
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orders') o
+    ON o.orderNumber = od.orderNumber
+ GROUP BY o.customerNumber
+)
+
+SELECT ROUND(AVG(profit),2) AS LTV
+  FROM CTE_profit_by_customer
+```
+
+<h6>Answer:</h6>
+<img width="67" alt="v)" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/21b2813e-40cc-45b1-a7cd-92b09cfb6375">
+
+<p> To calculate the amount of money we can allocate to acquiring new customers, we can compute the Customer Lifetime Value (LTV). The LTV represents the average monetary value that a customer generates over their lifetime as a customer. By determining the LTV, we can establish a budget for marketing efforts aimed at acquiring new customers.
+	
+The Customer Lifetime Value (LTV) provides insight into the average profit generated by a customer over their lifetime with our store. Utilizing this metric enables us to forecast our future profitability. For example, if we anticipate acquiring ten new customers next month, we can project an earnings potential of $390,395. This prediction allows us to make informed decisions regarding the amount we can invest in acquiring new customers. </p>
