@@ -78,3 +78,404 @@ SELECT od.productCode,  
   
 The product with the lowest product sold was 1957 Ford Thunderbird.
 </p>
+
+<li><h5>What is the best product per office?</h5></li>
+
+```sql
+WITH CTE_products_rank AS (
+SELECT offices.city, 	        
+       od.productCode, 			  
+       p.productName,  			 
+       p.productLine, 			 
+       SUM(od.quantityOrdered) AS TotalProductSold, 			 
+       RANK() OVER (PARTITION BY offices.city ORDER BY SUM(od.quantityOrdered)DESC) AS rank 		
+  FROM OPENQUERY(STORES , 'SELECT * FROM products') p 	   
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od 	      
+    ON od.productCode = p.productCode 		
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orders') o 		
+    ON o.orderNumber = od.orderNumber 	
+  JOIN OPENQUERY(STORES , 'SELECT * FROM customers') c 		 
+    ON c.customerNumber = o.customerNumber 	   
+  JOIN OPENQUERY(STORES , 'SELECT * FROM employees') e 		  
+    ON e.employeeNumber = c.salesRepEmployeeNumber 		
+  JOIN OPENQUERY(STORES , 'SELECT * FROM offices') offices 		  
+    ON offices.officeCode = e.officeCode 	  
+ GROUP BY offices.city, od.productCode, p.productName, p.productLine  
+)  
+SELECT * 
+  FROM CTE_products_rank
+ WHERE rank = 1
+ ORDER BY TotalProductSold DESC
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/b2).png">
+<p>In three of the seven offices, the product with the highest sales is 1992 Ferrari 360 Spider red. Paris is the office with the highest sales of this product with 744 sales.</p>
+
+<li><h5>What is the best-selling product line?</h5></li>
+
+```sql
+SELECT p.productLine,
+       SUM(od.quantityOrdered) AS TotalProductSold,
+       CAST((SUM(od.quantityOrdered)*1.0/(SELECT SUM(quantityOrdered) FROM OPENQUERY(STORES , 'SELECT * FROM orderdetails')))*100 AS DECIMAL(10,2)) AS PercentageProductSold
+  FROM OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+  JOIN OPENQUERY(STORES , 'SELECT * FROM products') p
+    ON od.productCode = p.productCode
+ GROUP BY p.productLine
+ ORDER BY TotalProductSold DESC 
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/c).png">
+<p>The best-selling product line is Classic Cars with a total of 35582 sales, which represents 33.72% of the total product sold.
+  
+The product line with the lowest sales is Trains.</p>
+
+<li><h5>In which country do customers buy the most products?</h5></li>
+
+```sql
+SELECT c.country,
+       SUM(od.quantityOrdered) AS TotalProductSold,
+       CAST((SUM(od.quantityOrdered)*1.0/(SELECT SUM(quantityOrdered) FROM OPENQUERY(STORES , 'SELECT * FROM orderdetails')))*100 AS DECIMAL(10,2)) AS percentageProductSold
+  FROM OPENQUERY(STORES , 'SELECT * FROM customers') c
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orders') o
+    ON c.customerNumber = o.customerNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON o.orderNumber = od.orderNumber
+ GROUP BY c.country
+ ORDER BY TotalProductSold DESC
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/d).png">
+<p>The U.S. is where consumers buy the most, with 33.97% of the products sold. Followed by Spain and France with 11.78% and 10.51% respectively.
+  
+The countries with the lowest sales are the Philippines, Hong Kong and Ireland.</p>
+
+<li><h5>What is the performance of the products</h5></li>
+
+```sql
+ SELECT p.productCode,
+        p.productName,
+        ROUND(SUM(od.quantityOrdered*od.priceEach),2) AS productperformance
+   FROM OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+   JOIN OPENQUERY(STORES , 'SELECT * FROM products') p
+     ON od.productCode = p.productCode
+  GROUP BY p.productCode, p.productName
+  ORDER BY SUM(od.quantityOrdered*od.priceEach) DESC
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/e).png">
+<p>The product performance represents the sum of sales per product (Quantity ordered by price). The product with the highest performance was 1992 Ferrari 360 Spider red, this product as seen before was also one of the best sellers. In performance is followed by 2001 Ferrari Enzo and 1952 Alpine Renault 1300, these were not the best sellers but due to their selling price they are much more significant in terms of performance.
+
+Although Ford Thunderbird, 1937 Lincoln Berline and American Airlines: MD-11S are the least sold, they have a good level of performance with respect to the total. The lowest performing products are 1982 Lamborghini Diablo, 1936 Mercedes Benz 500k Roadster and 1939 Chevrolet Deluxe Coupe.</p>
+
+<li><h5>What are those products with low stock levels (i.e. products in demand)?</h5></li>
+
+```sql
+ SELECT p.productCode,
+        p.productName,
+        p.productLine,
+        SUM(od.quantityOrdered) AS quantityOrdered,
+        p.quantityInStock,
+        ROUND(SUM(od.quantityOrdered)*1.0/p.quantityInStock ,2) AS lowstock
+   FROM OPENQUERY(STORES , 'SELECT * FROM products') p
+   JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+     ON p.productCode = od.productCode
+  GROUP BY p.productCode, p.productName, p.productLine, p.quantityInStock
+  ORDER BY SUM(od.quantityOrdered)*1.0/p.quantityInStock DESC
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/f).png">
+<p>The low stock represents the quantity of the sum of each product ordered divided by the quantity of product in stock. The highest rates will be the products that are almost out-of-stock or completely out-of-stock. These products are 1960 BSA Gold Star DBD34, 1968 Ford Mustang and 1928 Ford Phaeton Deluxe. </p>
+
+<li><h5>Which products should be ordered more?</h5></li>
+
+```sql
+WITH  CTE_product_performance AS (
+SELECT p.productCode,
+       p.productName,
+       ROUND(SUM(od.quantityOrdered*od.priceEach),2) AS productperformance
+  FROM OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+  JOIN OPENQUERY(STORES , 'SELECT * FROM products') p
+    ON od.productCode = p.productCode 	  GROUP BY p.productCode, p.productName ),
+
+CTE_low_stock AS (
+SELECT p.productCode,
+       p.productName,
+       p.productLine,
+       SUM(od.quantityOrdered) AS quantityOrdered,
+       p.quantityInStock,
+       ROUND(SUM(od.quantityOrdered)*1.0/p.quantityInStock ,2) AS lowstock
+  FROM OPENQUERY(STORES , 'SELECT * FROM products') p
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON p.productCode = od.productCode
+ GROUP BY p.productCode, p.productName, p.productLine, p.quantityInStock
+)
+
+SELECT ls.*,
+       pp.productperformance
+ FROM (SELECT TOP 10 *
+         FROM CTE_product_performance
+        ORDER BY productperformance DESC) pp
+ JOIN CTE_low_stock ls
+   ON pp.productCode = ls.productCode
+ORDER BY ls.lowstock DESC
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/g).png">
+<p>Priority products for restocking are those with high product performance that are on the brink of being out of stock. As mentioned above, the Classic Cars product line is the one with the highest sales, and 6 of the 10 products with the highest performance belong to this category. Taking this into account the primary focus for restocking should be on classic cars. These items have a high sales frequency and are among the top-performing products. In addition to this product line, it is important to take into account the other products that are in the top 10 in performance and to give priority to their replenishment, taking into account their low stock levels.   
+
+Knowing this will improve supply chain efficiency and increase user satisfaction by ensuring that the best performing products are always in stock and available.
+
+ <ul><li><h5>Considering the low stock</h5></li></ul>
+
+On the other hand, and just as important, we have the products that are low in stock, and that must be replenished by prioritizing those that have a better performance. 
+</p>
+
+```sql
+WITH  CTE_product_performance AS (
+SELECT p.productCode,
+       p.productName,
+       ROUND(SUM(od.quantityOrdered*od.priceEach),2) AS productperformance
+  FROM OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+  JOIN OPENQUERY(STORES , 'SELECT * FROM products') p
+    ON od.productCode = p.productCode
+ GROUP BY p.productCode, p.productName ),
+
+CTE_low_stock AS (
+SELECT p.productCode,
+       p.productName,
+       p.productLine,
+       SUM(od.quantityOrdered) AS quantityOrdered,
+       p.quantityInStock,
+       ROUND(SUM(od.quantityOrdered)*1.0/p.quantityInStock ,2) AS lowstock
+  FROM OPENQUERY(STORES , 'SELECT * FROM products') p
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON p.productCode = od.productCode
+ GROUP BY p.productCode, p.productName, p.productLine, p.quantityInStock
+)
+
+SELECT ls.*,
+       pp.productperformance
+  FROM (SELECT TOP 10 *
+          FROM CTE_low_stock
+         ORDER BY lowstock DESC) ls
+  JOIN CTE_product_performance pp
+    ON pp.productCode = ls.productCode
+ ORDER BY pp.productperformance DESC
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/g2).png">
+<p>Having this list we can point out the product 1968 Ford Mustang, this is in both lists, and should be the priority to be restocked, having high sales and good performance. Knowing this will improve supply chain efficiency and enhance user satisfaction by ensuring that the highest-demand products are consistently in stock and available.
+
+This strategy guarantees that the most successful and in-demand products are restocked promptly, supporting the objective of maintaining sufficient inventory levels and satisfying customer needs.</p>
+
+<li><h5> Which product has a higher profit? </h5></li>
+
+```sql
+
+SELECT p.productCode,
+       p.productName,
+       p.productLine,
+       SUM(od.quantityOrdered*od.PriceEach) AS Revenue,
+       SUM(od.quantityOrdered*(od.PriceEach-p.buyPrice)) AS Profit,
+       CAST(SUM(od.quantityOrdered*(od.PriceEach-p.buyPrice))/SUM(od.quantityOrdered*od.PriceEach)*100 AS DECIMAL(10,2)) AS ProfitMargin
+  FROM OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+  JOIN OPENQUERY(STORES , 'SELECT * FROM products') p
+    ON od.productCode = p.productCode
+ GROUP BY p.productCode, p.productName, p.productLine
+ ORDER BY Profit DESC
+
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/h).png">
+ 
+<p> The most profitable product is 1992 Ferrari 360 Spider red. Note that the second place and third place according to profit are the third and second place respectively according to revenue. This indicates that although 2001 Ferrari Enzo has higher revenue, the product 1952 Alpine Renault 1300 is more efficient in converting revenue into profit. Of these three products, the one with the highest Profit Margin is 1952 Alpine Renault 1300, which tells us that of the three, it is the most profitable.
+</p>
+
+<li><h5> Use the Pareto principle to analyze revenue by product line. </h5></li>
+
+```sql
+WITH ProductRevenue AS (
+SELECT p.productLine,
+       SUM(od.quantityOrdered*od.PriceEach) AS Revenue
+  FROM OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+  JOIN OPENQUERY(STORES , 'SELECT * FROM products') p
+    ON od.productCode = p.productCode
+ GROUP BY p.productLine )
+,
+Pareto AS (
+SELECT *,
+       SUM(Revenue) OVER (ORDER BY Revenue DESC) AS CumulativeRevenue,
+       SUM(Revenue) OVER () AS TotalRevenue
+  FROM ProductRevenue
+)
+
+SELECT *,
+       (CumulativeRevenue / TotalRevenue) * 100 AS CumulativePercentage
+  FROM Pareto
+ ORDER BY CumulativeRevenue
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/i).png">
+<p> 
+Based on the Pareto principle, it can be seen that 70.5% of the revenue comes from the Classic Cars, Vintage Cars and Motorcycles product lines. Motorcycles 
+</p>
+
+<li><h5> Are there any products that have never been sold? </h5></li>
+
+```sql
+SELECT *
+  FROM OPENQUERY(STORES , 'SELECT * FROM products')
+ WHERE productCode NOT IN ( SELECT productCode
+                              FROM OPENQUERY(STORES , 'SELECT * FROM orderdetails'))
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/j).png">
+<p> 
+The 1985 Toyota Supra has never been sold and has 7733 products in stock, an alarming number. This product is known as deadstock, as it has not been sold for a long period of time.  This product can become a financial burden, as they take up storage space and, over time, can cause losses due to possible damage. 
+</p>
+
+<li><h5> How is the revenue trend? </h5></li>
+
+```sql
+SELECT YEAR(o.orderDate) AS year,
+       SUM(od.quantityOrdered) AS TotalProductSold,
+       COUNT(*) AS TotalSales,
+       ROUND(SUM(od.quantityOrdered*od.priceEach),2) AS Revenue,
+       CAST(ISNULL((SUM(od.quantityOrdered*od.priceEach) - LAG(SUM(od.quantityOrdered*od.priceEach), 1) OVER (ORDER BY YEAR(o.orderDate)))/LAG(SUM(od.quantityOrdered*od.priceEach), 1) OVER (ORDER BY YEAR(o.orderDate)),0)*100 AS DECIMAL(10,2)) AS DiffRevenue
+  FROM OPENQUERY(STORES , 'SELECT * FROM orders') o
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON o.orderNumber = od.orderNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM products') p
+    ON od.productCode = p.productCode
+ GROUP BY YEAR(o.orderDate)
+ ORDER BY year 
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/k).png">
+<p> 
+Overall sales, performance and profit increased from 2003 to 2004, revenue increased by 36.13%, but in 2005 seems to be decreasing. However, with the query below you can see that the complete information for the last year is not shown.
+</p>
+
+```sql
+  SELECT MAX(orderDate) AS LastDate
+    FROM OPENQUERY(STORES , 'SELECT * FROM orders')
+```
+<h6>Output:</h6>
+ <img width="200" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/k2).png">
+
+ <ul><li><h5> Taking into account the YTD </h5></li></ul>
+<p> YTD information will be used to know the sales made in the year up to May. </p>
+ 
+ ```sql
+WITH
+CTE_YTD AS(
+SELECT YEAR(o.orderDate) AS year,
+       MONTH(o.orderDate) AS month,
+       DATENAME(MONTH, o.orderDate) AS monthName,
+       SUM(od.quantityOrdered) AS TotalProductSold,
+       COUNT(*) AS TotalSales,
+       ROUND(SUM(od.quantityOrdered*od.priceEach),2) AS Revenue,
+       SUM(SUM(od.quantityOrdered*od.priceEach)) OVER (PARTITION BY YEAR(o.orderDate) ORDER BY MONTH(o.orderDate)) AS cumulativeRevenue, 		   
+       CAST(ISNULL((SUM(od.quantityOrdered*od.priceEach) - LAG(SUM(od.quantityOrdered*od.priceEach), 1) OVER (ORDER BY YEAR(o.orderDate)))/LAG(SUM(od.quantityOrdered*od.priceEach), 1) OVER (PARTITION BY YEAR(o.orderDate) ORDER BY YEAR(o.orderDate),MONTH(o.orderDate)),0)*100 AS DECIMAL(10,2)) AS DiffRevenue
+  FROM OPENQUERY(STORES , 'SELECT * FROM orders') o
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON o.orderNumber = od.orderNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM products') p
+    ON od.productCode = p.productCode
+ GROUP BY YEAR(o.orderDate),MONTH(o.orderDate),DATENAME(MONTH, o.orderDate)
+)
+
+SELECT year,
+       monthName,
+       Revenue,
+       cumulativeRevenue,
+       CAST(ISNULL((SUM(Revenue) - LAG(SUM(Revenue), 1) OVER (ORDER BY year))/LAG(SUM(Revenue), 1) OVER (ORDER BY year),0)*100 AS DECIMAL(10,2)) AS DiffRevenue,
+       CAST(ISNULL((SUM(cumulativeRevenue) - LAG(SUM(cumulativeRevenue), 1) OVER (ORDER BY year))/LAG(SUM(cumulativeRevenue), 1) OVER (ORDER BY year),0)*100 AS DECIMAL(10,2)) AS DiffRevenueCumulative
+  FROM CTE_YTD  WHERE month = 5
+ GROUP BY year,month, monthName,Revenue, cumulativeRevenue
+ ORDER BY year,month
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/k3).png">
+<p> 
+It can be seen from the total accumulated revenue up to the month of May of each year that there is a significant increase, from 2003 to 2004 of 38.39%, and from 2004 to 2005 a much greater increase of 77.78%. This indicates an upward trend in revenue.
+</p>
+
+<li><h5> What is the best and worst selling product according to the product line? </h5></li>
+
+```sql
+WITH
+CTE_BestProducts_Line AS (
+SELECT p.productLine,
+       p.productCode,
+       p.productName,
+       SUM(od.quantityOrdered) AS TotalProductSold,
+       MAX(SUM(od.quantityOrdered)) OVER(PARTITION BY p.productLine) AS MaxProductSold,
+       MIN(ISNULL(SUM(od.quantityOrdered),0)) OVER(PARTITION BY p.productLine) AS MinProductSold,
+       RANK() OVER(PARTITION BY p.productLine ORDER BY SUM(od.quantityOrdered) DESC) AS RankMax,
+       RANK() OVER(PARTITION BY p.productLine ORDER BY ISNULL(SUM(od.quantityOrdered),0) ASC) AS RankMin,
+       MAX(SUM(od.quantityOrdered)) OVER(PARTITION BY p.productLine) - MIN(ISNULL(SUM(od.quantityOrdered),0)) OVER(PARTITION BY p.productLine) AS range   
+  FROM OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+ RIGHT JOIN OPENQUERY(STORES , 'SELECT * FROM products') p
+    ON od.productCode = p.productCode
+ GROUP BY p.productLine, p.productCode, p.productName
+)
+
+SELECT plmax.productLine,
+       plmax.productCode AS Best_productCode,
+       plmax.productName AS Best_productName,
+       plmax.MaxProductSold AS Best_MaxProductSold,
+       plmin.productCode AS Worst_productCode,
+       plmin.productName AS Worst_productName,
+       plmin.MinProductSold AS Worst_MinProductSold,
+       plmax.range
+ FROM (SELECT * FROM CTE_BestProducts_Line WHERE RankMax=1) plmax
+ JOIN (SELECT * FROM CTE_BestProducts_Line WHERE RankMin=1) plmin
+   ON plmax.productLine = plmin.productLine
+ORDER BY plmax.MaxProductSold DESC
+```
+<h6>Answer:</h6>
+ <img width="800" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/l).png">
+<p> 
+Although the product line has the best-selling product, it also has a product that has no sales. This makes for a very large range of sales. This shows a great variability in the demand for this category. In the case of the train product line, it is the lowest sales category and the range is very small, there is not much difference between the product that sells the most and the one that sells the least, so it is a category that could be for a specific customer segment, this segment could be identified and a marketing study could be done.
+</p>
+
+<li><h5> What is the best and worst selling product line according to the country? </h5></li>
+
+```sql
+WITH
+CTE_BestProducts_country AS (
+SELECT c.country,
+       MAX(SUM(od.quantityOrdered)) OVER(PARTITION BY c.country) AS MaxProductSold,
+       MIN(ISNULL(SUM(od.quantityOrdered),0)) OVER(PARTITION BY c.country) AS MinProductSold,
+       RANK() OVER(PARTITION BY c.country ORDER BY SUM(od.quantityOrdered) DESC) AS RankMax,
+       RANK() OVER(PARTITION BY c.country ORDER BY ISNULL(SUM(od.quantityOrdered),0) ASC) AS RankMin,
+       MAX(SUM(od.quantityOrdered)) OVER(PARTITION BY c.country) - MIN(ISNULL(SUM(od.quantityOrdered),0)) OVER(PARTITION BY c.country) AS range
+  FROM OPENQUERY(STORES , 'SELECT * FROM products') p
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orderdetails') od
+    ON od.productCode = p.productCode
+  JOIN OPENQUERY(STORES , 'SELECT * FROM orders') o
+	  ON o.orderNumber = od.orderNumber
+  JOIN OPENQUERY(STORES , 'SELECT * FROM customers') c
+    ON c.customerNumber = o.customerNumber
+ GROUP BY c.country,  p.productLine
+)
+
+SELECT plmax.country,
+       plmax.productLine,
+       plmax.MaxProductSold,
+       plmin.productLine,
+       plmin.MinProductSold,
+       plmax.range
+  FROM (SELECT * FROM CTE_BestProducts_country WHERE RankMax=1) plmax
+  JOIN (SELECT * FROM CTE_BestProducts_country WHERE RankMin=1) plmin
+    ON plmax.country = plmin.country
+ ORDER BY plmax.country, plmax.MaxProductSold DESC
+```
+<h6>Answer:</h6>
+ <img width="500" alt="Coding" src="https://github.com/dayannefuentes/Portfolio-Projects/blob/main/m).png">
+<p> 
+Most countries prefer the Classic Cars product line. However, in Canada they prefer Trucks and Buses, in Hong Kong and Japan they prefer Planes. The latter two categories are known to have the lowest sales. More research could be done on the market in these specific countries, understanding the customer's needs, increasing their visibility or complementing with other products to diversify it.
+</p>
+
+
