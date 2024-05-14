@@ -30,11 +30,15 @@ The scale model cars database contains eight tables: 
 
 - Employees: basic employee information such as name, email, job title and who they report to.
 
-- Offices: basic sales office information such as address and phone number. Orders: customer sales orders with order dates, require dates, process status and comments. OrderDetails: detailed information or sales order line for each sales order. 
+- Offices: basic sales office information such as address and phone number.
+
+- Orders: customer sales orders with order dates, require dates, process status and comments.
+
+- OrderDetails: detailed information or sales order line for each sales order. 
 
 - Payments: customers' payment records Products: a list of scale model vehicles ProductLines: a list of product line categories.
 
-Each table contains a column with its primary key, and is linked to the key of another table as shown in the schematic (IMAGE)  
+Each table contains a column with its primary key, and is linked to the key of another table as shown in the schematic below.  
 
 <img width="535" alt="schema stores" src="https://github.com/dayannefuentes/Portfolio-Projects/assets/167659572/aedabc75-aed7-4432-aafd-e475a70904c8">
 
