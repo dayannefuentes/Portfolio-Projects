@@ -816,4 +816,3 @@ The Customer Lifetime Value (LTV) provides insight into the average profit gener
 
 </ol>
 
-<h1><a name="Final analysis">Final analysis</a></h1>
